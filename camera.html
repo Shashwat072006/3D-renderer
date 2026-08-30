@@ -365,7 +365,12 @@ img#previewImage.active {
 
   <!-- Default Blueprint Viewfinder Display -->
   <div class="blueprint-placeholder" id="placeholder">
-    <div class="placeholder-icon">📸</div>
+    <div class="placeholder-icon">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
+      </svg>
+    </div>
     <h2 class="placeholder-title">Ready to <em>Capture in 3D</em></h2>
     <p class="placeholder-desc">
       Tap the button below to take a photo. It will automatically transmit and render in interactive 3D on your desktop screen.
@@ -397,18 +402,18 @@ img#previewImage.active {
   </div>
 </main>
 
-<div class="toast-msg" id="toast">✨ Photo sent! Check your computer screen for 3D model.</div>
+<div class="toast-msg" id="toast">Photo sent. Reconstructing 3D model on desktop screen.</div>
 
 <div class="controls-footer">
   <div class="action-buttons">
     <!-- Main Native Camera Trigger -->
     <button class="btn-capture-main" id="btnTakeCameraPhoto">
-      <span>📸</span> Take 3D Photo
+      Take 3D Photo
     </button>
 
     <!-- Gallery Upload Option -->
     <button class="btn-gallery" id="btnOpenGallery">
-      <span>📁</span> Gallery
+      Gallery
     </button>
   </div>
 
@@ -455,7 +460,7 @@ btnGallery.addEventListener('click', (e) => {
 function handleImageSelection(file) {
   if (!file) return;
 
-  statusHint.textContent = '⚡ Processing photo & estimating 3D depth...';
+  statusHint.textContent = 'Processing photo and estimating 3D depth...';
   hudState.textContent = 'EXTRACTING DEPTH';
   connStatusText.textContent = 'UPLOADING...';
 
@@ -527,18 +532,18 @@ async function uploadToDesktop(dataUrl) {
     const result = await response.json();
 
     if (result.success) {
-      showToast('✨ Sent! Look at your desktop screen — 3D rendered!');
-      statusHint.textContent = '✅ Success! 3D Model is rendering on your computer.';
+      showToast('Photo uploaded. 3D model is rendering on desktop.');
+      statusHint.textContent = 'Success: 3D model is rendering on desktop screen.';
       hudState.textContent = 'RENDERED 3D';
       connStatusText.textContent = 'SYNCED 3D';
     } else {
-      showToast('⚠️ Upload error: ' + (result.error || 'Server error'));
+      showToast('Upload error: ' + (result.error || 'Server error'));
       statusHint.textContent = 'Upload failed, tap to retry.';
       hudState.textContent = 'ERROR';
     }
   } catch (err) {
     console.error('Upload error:', err);
-    showToast('⚠️ Could not connect to desktop server');
+    showToast('Could not connect to desktop server');
     statusHint.textContent = 'Check Wi-Fi connection to desktop.';
     hudState.textContent = 'OFFLINE';
   } finally {

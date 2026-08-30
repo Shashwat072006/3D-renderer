@@ -168,13 +168,13 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalIpAddresses();
   console.log('====================================================');
-  console.log(`⚡ 3D Ray Tracer & Blueprint Server running on port ${PORT}`);
-  console.log(`💻 Desktop App:    http://localhost:${PORT}/index.html`);
-  console.log(`🎨 3D Scanner:     http://localhost:${PORT}/3d-scanner.html`);
-  console.log(`🔮 3D Ray Tracer:  http://localhost:${PORT}/raytracer.html`);
-  console.log('📱 Phone Camera Connection URLs:');
+  console.log(`Blueprint & 3D Ray Tracer Server running on port ${PORT}`);
+  console.log(`- Desktop App:    http://localhost:${PORT}/index.html`);
+  console.log(`- 3D Scanner:     http://localhost:${PORT}/3d-scanner.html`);
+  console.log(`- 3D Ray Tracer:  http://localhost:${PORT}/raytracer.html`);
+  console.log('Phone Camera Connection URLs:');
   ips.forEach(ip => {
-    console.log(`   👉 http://${ip}:${PORT}/camera.html`);
+    console.log(`  http://${ip}:${PORT}/camera.html`);
   });
   console.log('====================================================');
 });
