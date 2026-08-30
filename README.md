@@ -71,12 +71,31 @@ Phone Camera Connection URLs:
 ### Step 3: Connect Phone Camera for 3D Scanning
 1. On your desktop, navigate to `http://localhost:3000/3d-scanner.html`.
 2. Click **Connect Phone** in the top navigation to view the QR code.
-3. On your phone (connected to the same Wi-Fi network), scan the QR code or open:
+3. On your phone (connected to the same Wi-Fi network), scan the QR code or open the displayed URL:
    ```
    http://<YOUR_LOCAL_IP>:3000/camera.html
    ```
 4. Tap **Take 3D Photo** or choose an image from your gallery.
 5. Your desktop screen will instantly reconstruct and render the photo into an interactive 3D model!
+
+---
+
+## 🔧 Phone Connection & Network Troubleshooting
+
+If your phone displays **"Site can't be reached"**:
+
+1. **Check Wi-Fi Network Profile (Windows)**:
+   - Go to **Windows Settings &rarr; Network & internet &rarr; Wi-Fi &rarr; [Your Wi-Fi network]**.
+   - Under *Network profile type*, ensure it is set to **Private network** (Public networks block incoming connections).
+
+2. **Allow Port 3000 in Windows Firewall**:
+   - Open PowerShell as Administrator and run:
+     ```powershell
+     New-NetFirewallRule -DisplayName "NodeJS Port 3000" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+     ```
+
+3. **Mobile Hotspot Alternative**:
+   - If your router has "Client Isolation" turned on, enable your phone's **Mobile Hotspot**, connect your computer to the hotspot, and scan the QR code.
 
 ---
 
