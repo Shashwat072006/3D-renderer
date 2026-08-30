@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Blueprint 3D Camera — Instant Phone-to-3D Capture</title>
+<meta name="description" content="Capture photos on your phone and instantly render them in 3D on your desktop in real-time.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-deep: #061626;
+  --navy: #0B2545;
+  --navy-soft: #12335F;
+  --cyan: #6FD3F5;
+  --cyan-dim: #3A7FA0;
+  --paper: #EAF2F8;
+  --paper-dim: #9FB6CC;
+  --signal: #FF6A3D;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--navy-deep);
+  background-image:
+    linear-gradient(rgba(111,211,245,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111,211,245,.055) 1px, transparent 1px);
+  background-size: 24px 24px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: var(--paper);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(6, 22, 38, 0.92);
+  border-bottom: 1px solid var(--cyan-dim);
+  z-index: 10;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.logo-mark {
+  width: 26px; height: 26px; position: relative;
+}
+.logo-outer { position: absolute; inset: 0; border: 2px solid var(--cyan); transform: rotate(14deg); }
+.logo-inner { position: absolute; inset: 5px; border: 1.5px solid var(--signal); transform: rotate(-10deg); }
+.brand-title {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 1.15rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cyan);
+}
+.status-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--signal);
+  background: rgba(255, 106, 61, 0.12);
+  border: 1px solid var(--signal);
+  padding: 0.25rem 0.55rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--signal);
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* VIEWFINDER AREA */
+.viewfinder-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+video#cameraStream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+canvas#captureCanvas { display: none; }
+
+/* HUD OVERLAY */
+.hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.2rem;
+}
+.hud-reticle {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(75vw, 75vh);
+  height: min(75vw, 75vh);
+  border: 1px dashed rgba(111, 211, 245, 0.35);
+}
+.hud-corner {
+  position: absolute;
+  width: 20px; height: 20px;
+  border-color: var(--signal);
+  border-style: solid;
+}
+.corner-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
+.corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; }
+.corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
+.corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+
+.hud-crosshair {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px; height: 24px;
+}
+.hud-crosshair::before, .hud-crosshair::after {
+  content: ''; position: absolute; background: var(--cyan);
+}
+.hud-crosshair::before { top: 11px; left: 0; width: 24px; height: 2px; }
+.hud-crosshair::after { top: 0; left: 11px; width: 2px; height: 24px; }
+
+.hud-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+  background: rgba(6, 22, 38, 0.65);
+  padding: 0.3rem 0.6rem;
+  backdrop-filter: blur(4px);
+  width: fit-content;
+}
+
+/* SCANNING BEAM */
+.scan-beam {
+  position: absolute;
+  left: 0; width: 100%; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  box-shadow: 0 0 15px var(--signal);
+  opacity: 0;
+  pointer-events: none;
+}
+.scan-beam.scanning {
+  opacity: 1;
+  animation: scanLoop 1.2s ease-in-out infinite alternate;
+}
+@keyframes scanLoop {
+  0% { top: 10%; }
+  100% { top: 90%; }
+}
+
+/* CONTROLS FOOTER */
+.controls-footer {
+  background: rgba(6, 22, 38, 0.95);
+  border-top: 1px solid var(--cyan-dim);
+  padding: 1.2rem 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: center;
+  z-index: 10;
+}
+.shutter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 400px;
+}
+.gallery-btn, .switch-cam-btn {
+  background: var(--navy-soft);
+  border: 1px solid var(--cyan-dim);
+  color: var(--paper);
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gallery-btn:active, .switch-cam-btn:active {
+  transform: scale(0.92);
+  border-color: var(--cyan);
+}
+
+.shutter-btn {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: transparent;
+  border: 3px solid var(--signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 4px;
+}
+.shutter-inner {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: var(--signal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  box-shadow: 0 0 20px rgba(255, 106, 61, 0.4);
+  transition: transform 0.1s;
+}
+.shutter-btn:active .shutter-inner {
+  transform: scale(0.88);
+}
+
+.hint-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--paper-dim);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+/* SUCCESS TOAST */
+.toast {
+  position: absolute;
+  top: 1.5rem; left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: var(--signal);
+  color: #fff;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.75rem 1.25rem;
+  border-radius: 4px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  z-index: 100;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo-mark"><div class="logo-outer"></div><div class="logo-inner"></div></div>
+    <span class="brand-title">3D Mobile Scanner</span>
+  </div>
+  <div class="status-pill" id="connStatus">
+    <div class="pulse-dot"></div>
+    <span>READY TO SCAN</span>
+  </div>
+</header>
+
+<main class="viewfinder-wrap">
+  <video id="cameraStream" autoplay playsinline muted></video>
+  <canvas id="captureCanvas"></canvas>
+
+  <div class="scan-beam" id="scanBeam"></div>
+
+  <div class="hud-overlay">
+    <div style="display:flex;justify-content:space-between;width:100%">
+      <span class="hud-text">MODE: MONOCULAR 3D</span>
+      <span class="hud-text" id="hudRes">1080P HUD</span>
+    </div>
+
+    <div class="hud-reticle">
+      <div class="hud-corner corner-tl"></div>
+      <div class="hud-corner corner-tr"></div>
+      <div class="hud-corner corner-bl"></div>
+      <div class="hud-corner corner-br"></div>
+      <div class="hud-crosshair"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;width:100%">
+      <span class="hud-text">TARGET: POINT AT OBJECT / SCENE</span>
+      <span class="hud-text">SYNC: DESKTOP LIVE</span>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast">✨ Photo uploaded! Generating 3D on desktop...</div>
+
+<div class="controls-footer">
+  <div class="shutter-row">
+    <!-- Gallery fallback button -->
+    <label class="gallery-btn" title="Pick from Gallery or Files">
+      📁
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+    </label>
+
+    <!-- Shutter button -->
+    <button class="shutter-btn" id="shutterBtn" aria-label="Take Photo & Render 3D">
+      <div class="shutter-inner">📸</div>
+    </button>
+
+    <!-- Camera Flip button -->
+    <button class="switch-cam-btn" id="flipCamBtn" title="Switch Camera">
+      🔄
+    </button>
+  </div>
+  <p class="hint-text" id="statusHint">Point camera at any building, room or object and tap Capture</p>
+</div>
+
+<script>
+'use strict';
+
+const video = document.getElementById('cameraStream');
+const canvas = document.getElementById('captureCanvas');
+const shutterBtn = document.getElementById('shutterBtn');
+const flipCamBtn = document.getElementById('flipCamBtn');
+const fileInput = document.getElementById('fileInput');
+const toast = document.getElementById('toast');
+const scanBeam = document.getElementById('scanBeam');
+const statusHint = document.getElementById('statusHint');
+const connStatus = document.getElementById('connStatus');
+const hudRes = document.getElementById('hudRes');
+
+let currentFacingMode = 'environment';
+let mediaStream = null;
+
+// Initialize Camera
+async function startCamera() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+  }
+
+  try {
+    const constraints = {
+      video: {
+        facingMode: { ideal: currentFacingMode },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    };
+
+    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = mediaStream;
+
+    video.onloadedmetadata = () => {
+      hudRes.textContent = `${video.videoWidth} × ${video.videoHeight}`;
+    };
+  } catch (err) {
+    console.warn('Direct camera stream error:', err);
+    statusHint.textContent = 'Tap 📁 to choose photo from Gallery/Camera';
+  }
+}
+
+// Flip Camera (Front / Back)
+flipCamBtn.addEventListener('click', () => {
+  currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  startCamera();
+});
+
+// Show Toast Alert
+function showToast(msg, duration = 3000) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, duration);
+}
+
+// Upload Captured Image to Desktop System
+async function uploadPhoto(dataUrl) {
+  scanBeam.classList.add('scanning');
+  statusHint.textContent = '⚡ Transmitting photo & depth data to desktop...';
+  connStatus.querySelector('span').textContent = 'SYNCING...';
+
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: dataUrl,
+        metadata: {
+          timestamp: Date.now(),
+          facingMode: currentFacingMode,
+          device: navigator.userAgent
+        }
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showToast('✨ Sent! Rendering in 3D on your desktop now!');
+      statusHint.textContent = '✅ Photo sent! Check your computer screen for 3D model.';
+      connStatus.querySelector('span').textContent = 'RENDERED 3D';
+    } else {
+      showToast('⚠️ Upload error: ' + (result.error || 'Server error'));
+      statusHint.textContent = 'Upload failed, please try again.';
+      connStatus.querySelector('span').textContent = 'ERROR';
+    }
+  } catch (err) {
+    console.error('Upload failed:', err);
+    showToast('⚠️ Could not connect to desktop server');
+    statusHint.textContent = 'Connection error. Ensure phone is on same Wi-Fi.';
+    connStatus.querySelector('span').textContent = 'DISCONNECTED';
+  } finally {
+    setTimeout(() => {
+      scanBeam.classList.remove('scanning');
+    }, 1500);
+  }
+}
+
+// Capture from Live Video Stream
+shutterBtn.addEventListener('click', () => {
+  if (video.videoWidth === 0 || video.videoHeight === 0) {
+    fileInput.click();
+    return;
+  }
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Resize / compress to reasonable 1200px max dimension for fast transmission
+  const maxDim = 1280;
+  let targetW = canvas.width;
+  let targetH = canvas.height;
+  if (targetW > maxDim || targetH > maxDim) {
+    if (targetW > targetH) {
+      targetH = Math.round((targetH * maxDim) / targetW);
+      targetW = maxDim;
+    } else {
+      targetW = Math.round((targetW * maxDim) / targetH);
+      targetH = maxDim;
+    }
+    const scaledCanvas = document.createElement('canvas');
+    scaledCanvas.width = targetW;
+    scaledCanvas.height = targetH;
+    scaledCanvas.getContext('2d').drawImage(canvas, 0, 0, targetW, targetH);
+    const dataUrl = scaledCanvas.toDataURL('image/jpeg', 0.88);
+    uploadPhoto(dataUrl);
+  } else {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    uploadPhoto(dataUrl);
+  }
+});
+
+// File picker / Gallery upload handler
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1280;
+      let targetW = img.width;
+      let targetH = img.height;
+      if (targetW > maxDim || targetH > maxDim) {
+        if (targetW > targetH) {
+          targetH = Math.round((targetH * maxDim) / targetW);
+          targetW = maxDim;
+        } else {
+          targetW = Math.round((targetW * maxDim) / targetH);
+          targetH = maxDim;
+        }
+      }
+      const c = document.createElement('canvas');
+      c.width = targetW;
+      c.height = targetH;
+      c.getContext('2d').drawImage(img, 0, 0, targetW, targetH);
+      const dataUrl = c.toDataURL('image/jpeg', 0.88);
+      uploadPhoto(dataUrl);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Start camera on load
+window.addEventListener('DOMContentLoaded', startCamera);
+</script>
+</body>
+</html>

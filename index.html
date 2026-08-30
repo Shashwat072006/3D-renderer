@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blueprint Viewer — Your Model, On Site, In Your Hand</title>
+<meta name="description" content="Open, inspect, present and experience SketchUp 3D models on iOS and Android. Blueprint Viewer brings CAD projects to the field — measure, present, and place in AR.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── DESIGN TOKENS ─────────────────────────────────────────────── */
+:root{
+  --navy-deep:#061626;
+  --navy:#0B2545;
+  --navy-soft:#12335F;
+  --cyan:#6FD3F5;
+  --cyan-dim:#3A7FA0;
+  --paper:#EAF2F8;
+  --paper-dim:#9FB6CC;
+  --signal:#FF6A3D;
+  --grid:48px;
+}
+
+/* ── RESET ─────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background-color:var(--navy-deep);
+  background-image:
+    linear-gradient(rgba(111,211,245,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(111,211,245,.055) 1px,transparent 1px);
+  background-size:var(--grid) var(--grid);
+  font-family:'IBM Plex Sans',sans-serif;
+  color:var(--paper);
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit}
+
+/* ── HEADER ────────────────────────────────────────────────────── */
+#site-header{
+  position:sticky;top:0;z-index:200;
+  display:flex;align-items:center;gap:2rem;
+  padding:.9rem 2.5rem;
+  background:rgba(6,22,38,.88);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(111,211,245,.22);
+}
+.logo-mark{
+  display:flex;align-items:center;justify-content:center;
+  width:36px;height:36px;position:relative;flex-shrink:0;
+}
+.logo-outer{
+  position:absolute;inset:0;
+  border:2px solid var(--cyan);
+  transform:rotate(14deg);
+}
+.logo-inner{
+  position:absolute;inset:7px;
+  border:1.5px solid var(--signal);
+  transform:rotate(-10deg);
+}
+.logo-name{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:1rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;
+  color:var(--cyan);
+  white-space:nowrap;
+}
+nav{display:flex;gap:2rem;margin-left:auto}
+nav a{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--paper-dim);
+  transition:color .15s;
+}
+nav a:hover{color:var(--cyan)}
+.cta-primary{
+  padding:.55rem 1.25rem;
+  background:var(--signal);
+  border:none;color:#fff;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
+  transition:all .15s;
+}
+.cta-primary:hover{
+  background:#ff8457;
+  transform:translateY(-2px);
+  box-shadow:0 4px 20px rgba(255,106,61,.45);
+}
+.cta-primary:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* ── HERO ──────────────────────────────────────────────────────── */
+#hero{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  min-height:calc(100vh - 57px);
+  align-items:center;
+  padding:4rem 2.5rem 4rem 4rem;
+  gap:2rem;
+  position:relative;
+  overflow:hidden;
+}
+
+/* hero copy */
+.hero-copy{display:flex;flex-direction:column;gap:1.5rem;z-index:2}
+.hero-eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--cyan-dim);
+}
+.hero-headline{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:clamp(2.8rem,5vw,4.2rem);
+  font-weight:800;line-height:1.0;
+  text-transform:uppercase;letter-spacing:.02em;
+  color:var(--paper);
+}
+.hero-headline em{
+  font-style:normal;
+  color:var(--cyan);
+  text-shadow:0 0 40px rgba(111,211,245,.35);
+}
+.hero-sub{
+  font-size:1rem;line-height:1.7;
+  color:var(--paper-dim);max-width:480px;
+}
+.hero-ctas{display:flex;gap:1rem;flex-wrap:wrap}
+.cta-secondary{
+  padding:.6rem 1.4rem;
+  background:transparent;
+  border:1px solid var(--cyan-dim);
+  color:var(--paper-dim);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
+  transition:all .15s;
+}
+.cta-secondary:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-2px)}
+.cta-secondary:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* live readout */
+.readout{
+  display:flex;gap:1.5rem;flex-wrap:wrap;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.7rem;letter-spacing:.08em;
+  color:var(--cyan-dim);
+  padding-top:.5rem;
+  border-top:1px solid rgba(111,211,245,.15);
+}
+.readout span b{color:var(--cyan)}
+
+/* hero stage — right column */
+.hero-stage{
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  min-height:420px;
+  z-index:2;
+}
+/* blueprint scan line */
+.scan-line{
+  position:absolute;
+  width:100%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:0;
+  pointer-events:none;
+  z-index:10;
+}
+@keyframes scan{
+  0%{transform:translateY(-120%);opacity:0}
+  6%{opacity:.7}
+  92%{opacity:.7}
+  100%{transform:translateY(1200%);opacity:0}
+}
+.scan-line{animation:scan 5.5s linear infinite}
+
+/* 3D model scene */
+.model-scene{
+  perspective:900px;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+.model-scene:active{cursor:grabbing}
+.model-wrapper{
+  position:relative;
+  width:220px;height:170px;
+  transform-style:preserve-3d;
+}
+.model-3d{
+  width:220px;height:170px;
+  position:relative;
+  transform-style:preserve-3d;
+  transform:rotateX(18deg) rotateY(-32deg);
+}
+.face{
+  position:absolute;
+  background-image:
+    linear-gradient(rgba(111,211,245,.13) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(111,211,245,.13) 1px,transparent 1px);
+  background-size:22px 22px;
+  background-color:rgba(6,22,38,.55);
+  border:1.5px solid rgba(111,211,245,.52);
+  backface-visibility:visible;
+}
+/* Box: W=220 H=170 D=190; half: 110 85 95 */
+.face.front {width:220px;height:170px;top:0;left:0; transform:translateZ(95px)}
+.face.back  {width:220px;height:170px;top:0;left:0; transform:rotateY(180deg) translateZ(95px)}
+.face.right {width:190px;height:170px;top:0;left:15px;transform:rotateY(90deg) translateZ(110px)}
+.face.left  {width:190px;height:170px;top:0;left:15px;transform:rotateY(-90deg) translateZ(110px)}
+.face.top   {width:220px;height:190px;top:-10px;left:0;transform:rotateX(-90deg) translateZ(85px)}
+.face.bottom{width:220px;height:190px;top:-10px;left:0;transform:rotateX(90deg) translateZ(85px)}
+
+/* dimension callout SVG overlay */
+.dim-svg{
+  position:absolute;
+  inset:0;width:100%;height:100%;
+  pointer-events:none;overflow:visible;
+  z-index:5;
+}
+.dim-line{
+  fill:none;stroke:var(--signal);stroke-width:1.5;
+  stroke-dasharray:60;stroke-dashoffset:60;
+  transition:stroke-dashoffset 0s;
+}
+.dim-line.drawn{
+  transition:stroke-dashoffset 1s ease-out;
+  stroke-dashoffset:0;
+}
+.dim-label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;fill:var(--signal);
+  opacity:0;transition:opacity .5s .8s;
+}
+.dim-label.drawn{opacity:1}
+.dim-tick{stroke:var(--signal);stroke-width:1.5;opacity:0;transition:opacity .5s .8s}
+.dim-tick.drawn{opacity:1}
+
+/* ── FEATURES ──────────────────────────────────────────────────── */
+#workflow{padding:7rem 4rem;max-width:1200px;margin:0 auto}
+.section-eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--cyan-dim);margin-bottom:.75rem;
+}
+.section-title{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:clamp(2rem,3.5vw,2.8rem);
+  font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--paper);margin-bottom:4rem;
+}
+
+.feature-row{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:3rem;align-items:center;
+  padding:2.5rem 0;
+  border-top:1px solid rgba(111,211,245,.12);
+  opacity:0;transform:translateY(28px);
+  transition:opacity .55s ease,transform .55s ease;
+}
+.feature-row.visible{opacity:1;transform:none}
+.feature-row:last-child{border-bottom:1px solid rgba(111,211,245,.12)}
+
+.feature-copy{display:flex;flex-direction:column;gap:.9rem}
+.feature-num{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.68rem;letter-spacing:.18em;color:var(--signal);
+}
+.feature-title{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:1.75rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--cyan);
+}
+.feature-desc{font-size:.9rem;line-height:1.75;color:var(--paper-dim);max-width:380px}
+
+/* phone mockup */
+.phone-wrap{
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.phone-svg{
+  width:160px;height:290px;
+  transition:transform .25s ease,filter .25s ease;
+  filter:drop-shadow(0 8px 32px rgba(0,0,0,.5));
+}
+.phone-wrap:hover .phone-svg{transform:translateY(-4px);filter:drop-shadow(0 16px 40px rgba(0,0,0,.6))}
+/* corner brackets */
+.phone-wrap::before,.phone-wrap::after,
+.phone-wrap .corner-bl,.phone-wrap .corner-tr{
+  content:'';position:absolute;
+  width:16px;height:16px;
+  border-color:var(--signal);border-style:solid;
+  opacity:0;transition:opacity .25s;
+}
+.phone-wrap:hover::before,.phone-wrap:hover::after,
+.phone-wrap:hover .corner-bl,.phone-wrap:hover .corner-tr{opacity:1}
+.phone-wrap::before{top:-8px;left:calc(50% - 88px);border-width:2px 0 0 2px}
+.phone-wrap::after{bottom:-8px;right:calc(50% - 88px);border-width:0 2px 2px 0}
+.phone-wrap .corner-bl{bottom:-8px;left:calc(50% - 88px);border-width:0 0 2px 2px}
+.phone-wrap .corner-tr{top:-8px;right:calc(50% - 88px);border-width:2px 2px 0 0}
+
+/* ── AR BAND ───────────────────────────────────────────────────── */
+#ar{
+  padding:7rem 2rem;
+  text-align:center;
+  background:linear-gradient(to bottom,transparent,rgba(18,51,95,.4),transparent);
+  border-top:1px solid rgba(111,211,245,.12);
+  border-bottom:1px solid rgba(111,211,245,.12);
+  position:relative;overflow:hidden;
+}
+.reticle{
+  position:relative;width:96px;height:96px;
+  margin:0 auto 3rem;
+}
+.reticle-corner{
+  position:absolute;width:22px;height:22px;
+  border-color:var(--signal);border-style:solid;
+}
+.reticle-corner.tl{top:0;left:0;border-width:3px 0 0 3px}
+.reticle-corner.tr{top:0;right:0;border-width:3px 3px 0 0}
+.reticle-corner.bl{bottom:0;left:0;border-width:0 0 3px 3px}
+.reticle-corner.br{bottom:0;right:0;border-width:0 3px 3px 0}
+.reticle-dot{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:10px;height:10px;
+  border-radius:50%;
+  background:var(--signal);
+}
+.reticle-ring{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:22px;height:22px;
+  border-radius:50%;
+  border:2px solid var(--signal);
+  opacity:0;
+}
+@keyframes pulse-ring{
+  0%{transform:translate(-50%,-50%) scale(1);opacity:.8}
+  100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}
+}
+.reticle-ring{animation:pulse-ring 1.6s ease-out infinite}
+
+.ar-title{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:clamp(2rem,4vw,3rem);font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;
+  color:var(--paper);margin-bottom:1.25rem;
+}
+.ar-sub{
+  font-size:.95rem;line-height:1.75;color:var(--paper-dim);
+  max-width:520px;margin:0 auto 2.5rem;
+}
+
+/* ── FOOTER ────────────────────────────────────────────────────── */
+footer{
+  padding:2.5rem 4rem;
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid rgba(111,211,245,.15);
+  flex-wrap:wrap;gap:1rem;
+}
+.footer-brand{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--cyan-dim);
+}
+.footer-links{display:flex;gap:1.5rem}
+.footer-links a{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--paper-dim);
+  transition:color .15s;
+}
+.footer-links a:hover{color:var(--cyan)}
+.footer-links a:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* ── REDUCED MOTION ────────────────────────────────────────────── */
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .feature-row{opacity:1;transform:none}
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────────── */
+@media(max-width:900px){
+  #hero{grid-template-columns:1fr;padding:3rem 1.5rem}
+  .hero-stage{order:-1}
+  #workflow{padding:4rem 1.5rem}
+  .feature-row{grid-template-columns:1fr}
+  .phone-wrap{display:none} /* hide on small screens */
+  nav{gap:1rem}
+  footer{flex-direction:column;align-items:flex-start;padding:2rem 1.5rem}
+}
+@media(max-width:600px){
+  #site-header{padding:.75rem 1.25rem;gap:1rem}
+  nav a:not(:last-child){display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════ HEADER ═══════════════════════════════ -->
+<header id="site-header">
+  <div class="logo-mark" aria-hidden="true">
+    <div class="logo-outer"></div>
+    <div class="logo-inner"></div>
+  </div>
+  <span class="logo-name">Blueprint</span>
+  <nav aria-label="Main navigation">
+    <a href="3d-scanner.html" id="nav-scanner" style="color:var(--signal);font-weight:600">📱 3D Photo Scanner</a>
+    <a href="raytracer.html" id="nav-raytracer" style="color:var(--cyan);font-weight:600">⚡ 3D Ray Tracer</a>
+    <a href="#workflow" id="nav-workflow">Workflow</a>
+    <a href="#ar" id="nav-ar">AR</a>
+  </nav>
+  <a href="3d-scanner.html" class="cta-primary" id="header-cta" style="display:inline-block;text-align:center;text-decoration:none">📱 Scan in 3D</a>
+</header>
+
+<!-- ════════════════════════════════ HERO ════════════════════════════════ -->
+<section id="hero" aria-label="Hero">
+
+  <div class="hero-copy">
+    <p class="hero-eyebrow">3D Viewer &nbsp;—&nbsp; Phone Camera to 3D &amp; Ray Tracing Engine</p>
+    <h1 class="hero-headline">Your model,<br>on <em>site</em>,<br>in your hand.</h1>
+    <p class="hero-sub">Snap a photo on your phone to instantly reconstruct and render it in interactive 3D in real-time, measure on the spot, and explore with our custom from-scratch 3D ray tracing engine.</p>
+    <div class="hero-ctas">
+      <a href="3d-scanner.html" class="cta-primary" id="hero-cta-primary" style="display:inline-block;text-decoration:none;padding:.6rem 1.4rem;text-align:center">📱 Connect Phone Camera (3D Scan)</a>
+      <a href="raytracer.html" class="cta-secondary" style="display:inline-block;text-decoration:none;text-align:center">⚡ 3D Ray Tracer</a>
+      <button class="cta-secondary" id="hero-cta-secondary" onclick="document.getElementById('ar').scrollIntoView({behavior:'smooth'})">See in AR</button>
+    </div>
+    <div class="readout" aria-live="polite" aria-label="Model rotation readout">
+      <span><b id="rot-x">ROT X &nbsp;18.0°</b></span>
+      <span><b id="rot-y">ROT Y −32.0°</b></span>
+      <span><b>SCALE 1 : 140</b></span>
+    </div>
+  </div>
+
+  <div class="hero-stage" id="hero-stage">
+    <div class="scan-line" aria-hidden="true"></div>
+
+    <div class="model-scene" id="model-scene" aria-label="Interactive 3D building wireframe — drag to rotate" role="img" tabindex="0">
+      <div class="model-wrapper">
+        <div class="model-3d" id="model-3d">
+          <div class="face front"  aria-hidden="true"></div>
+          <div class="face back"   aria-hidden="true"></div>
+          <div class="face right"  aria-hidden="true"></div>
+          <div class="face left"   aria-hidden="true"></div>
+          <div class="face top"    aria-hidden="true"></div>
+          <div class="face bottom" aria-hidden="true"></div>
+        </div>
+
+        <!-- dimension callouts -->
+        <svg class="dim-svg" aria-hidden="true" viewBox="0 0 220 170" xmlns="http://www.w3.org/2000/svg">
+          <!-- horizontal dimension: width 9.4 M -->
+          <line id="dl1" class="dim-line" x1="10" y1="155" x2="210" y2="155"/>
+          <line class="dim-tick" id="dt1a" x1="10" y1="150" x2="10" y2="162"/>
+          <line class="dim-tick" id="dt1b" x1="210" y1="150" x2="210" y2="162"/>
+          <text class="dim-label" id="dlabel1" x="100" y="170" text-anchor="middle">9.4 M</text>
+          <!-- vertical dimension: height 6.2 M -->
+          <line id="dl2" class="dim-line" x1="228" y1="10" x2="228" y2="160"/>
+          <line class="dim-tick" id="dt2a" x1="223" y1="10" x2="233" y2="10"/>
+          <line class="dim-tick" id="dt2b" x1="223" y1="160" x2="233" y2="160"/>
+          <text class="dim-label" id="dlabel2" x="245" y="90" text-anchor="middle" dominant-baseline="middle">6.2 M</text>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════════════════════ FEATURES ════════════════════════════════ -->
+<section id="workflow" aria-label="Feature workflow">
+  <div class="section-eyebrow">How it fits your day</div>
+  <h2 class="section-title">Four moments.<br>One tool.</h2>
+
+  <!-- 01 Open -->
+  <article class="feature-row" aria-label="Feature 01: Open">
+    <div class="feature-copy">
+      <p class="feature-num">01 &nbsp;/&nbsp; Open</p>
+      <h3 class="feature-title">Pick up any project, instantly.</h3>
+      <p class="feature-desc">Open SketchUp files straight from Trimble Connect or your phone's Files app — no syncing, no conversion, no waiting for a laptop to boot.</p>
+    </div>
+    <div class="phone-wrap">
+      <div class="corner-bl"></div>
+      <div class="corner-tr"></div>
+      <!-- Phone mockup: stacked file rows -->
+      <svg class="phone-svg" viewBox="0 0 160 290" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="8" width="144" height="274" rx="18" fill="#0B2545" stroke="#3A7FA0" stroke-width="1.5"/>
+        <rect x="22" y="28" width="116" height="234" rx="4" fill="#061626"/>
+        <circle cx="80" cy="14" r="3" fill="#3A7FA0"/>
+        <!-- file rows -->
+        <g fill="none" stroke="#6FD3F5" stroke-width="1">
+          <rect x="32" y="48" width="96" height="28" rx="3" fill="rgba(111,211,245,.06)" stroke="rgba(111,211,245,.4)"/>
+          <rect x="32" y="84" width="96" height="28" rx="3" fill="rgba(111,211,245,.06)" stroke="rgba(111,211,245,.4)"/>
+          <rect x="32" y="120" width="96" height="28" rx="3" fill="rgba(111,211,245,.06)" stroke="rgba(111,211,245,.4)"/>
+          <rect x="32" y="156" width="96" height="28" rx="3" fill="rgba(255,106,61,.08)" stroke="rgba(255,106,61,.6)"/>
+          <rect x="32" y="192" width="96" height="28" rx="3" fill="rgba(111,211,245,.06)" stroke="rgba(111,211,245,.4)"/>
+        </g>
+        <!-- file icons -->
+        <rect x="37" y="54" width="14" height="16" rx="1" fill="none" stroke="#6FD3F5" stroke-width="1"/>
+        <rect x="37" y="90" width="14" height="16" rx="1" fill="none" stroke="#6FD3F5" stroke-width="1"/>
+        <rect x="37" y="126" width="14" height="16" rx="1" fill="none" stroke="#6FD3F5" stroke-width="1"/>
+        <rect x="37" y="162" width="14" height="16" rx="1" fill="none" stroke="#FF6A3D" stroke-width="1"/>
+        <rect x="37" y="198" width="14" height="16" rx="1" fill="none" stroke="#6FD3F5" stroke-width="1"/>
+        <line x1="56" y1="60" x2="110" y2="60" stroke="#6FD3F5" stroke-width="1" opacity=".5"/>
+        <line x1="56" y1="96" x2="110" y2="96" stroke="#6FD3F5" stroke-width="1" opacity=".5"/>
+        <line x1="56" y1="132" x2="110" y2="132" stroke="#6FD3F5" stroke-width="1" opacity=".5"/>
+        <line x1="56" y1="168" x2="110" y2="168" stroke="#FF6A3D" stroke-width="1.5" opacity=".8"/>
+        <line x1="56" y1="204" x2="95"  y2="204" stroke="#6FD3F5" stroke-width="1" opacity=".5"/>
+        <!-- cloud sync icon -->
+        <path d="M96 240 Q102 234 108 240 Q114 236 116 242 Q118 248 112 250 H96 Q90 250 90 244 Q90 238 96 240Z" fill="none" stroke="#6FD3F5" stroke-width="1" opacity=".6"/>
+      </svg>
+    </div>
+  </article>
+
+  <!-- 02 Inspect -->
+  <article class="feature-row" aria-label="Feature 02: Inspect">
+    <div class="feature-copy">
+      <p class="feature-num">02 &nbsp;/&nbsp; Inspect</p>
+      <h3 class="feature-title">Measure without a tape.</h3>
+      <p class="feature-desc">Tap any edge for its true dimension, read existing annotations, and check clearances against the model — not against a printout.</p>
+    </div>
+    <div class="phone-wrap">
+      <div class="corner-bl"></div>
+      <div class="corner-tr"></div>
+      <!-- Phone mockup: wireframe triangle + dimension line -->
+      <svg class="phone-svg" viewBox="0 0 160 290" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="8" width="144" height="274" rx="18" fill="#0B2545" stroke="#3A7FA0" stroke-width="1.5"/>
+        <rect x="22" y="28" width="116" height="234" rx="4" fill="#061626"/>
+        <circle cx="80" cy="14" r="3" fill="#3A7FA0"/>
+        <!-- wireframe model -->
+        <g fill="none" stroke="#6FD3F5" stroke-width="1" opacity=".7">
+          <polygon points="80,50 35,160 125,160" stroke-width="1.5"/>
+          <line x1="80" y1="50" x2="80" y2="160"/>
+          <line x1="57.5" y1="105" x2="80" y2="105"/>
+          <line x1="57.5" y1="105" x2="57.5" y2="160"/>
+          <!-- back face suggestion -->
+          <polygon points="80,50 125,60 125,160" opacity=".3" stroke-dasharray="3,3"/>
+        </g>
+        <!-- dimension callout -->
+        <line x1="35" y1="172" x2="125" y2="172" stroke="#FF6A3D" stroke-width="1.5"/>
+        <line x1="35" y1="167" x2="35" y2="177" stroke="#FF6A3D" stroke-width="1.5"/>
+        <line x1="125" y1="167" x2="125" y2="177" stroke="#FF6A3D" stroke-width="1.5"/>
+        <text x="80" y="188" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#FF6A3D">12.4 M</text>
+        <!-- tap highlight -->
+        <circle cx="80" cy="160" r="6" fill="none" stroke="#FF6A3D" stroke-width="1.5" opacity=".9"/>
+        <circle cx="80" cy="160" r="12" fill="none" stroke="#FF6A3D" stroke-width="1" opacity=".4"/>
+        <!-- bottom label -->
+        <text x="80" y="218" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#3A7FA0" letter-spacing="1">TAP EDGE TO MEASURE</text>
+      </svg>
+    </div>
+  </article>
+
+  <!-- 03 Present -->
+  <article class="feature-row" aria-label="Feature 03: Present">
+    <div class="feature-copy">
+      <p class="feature-num">03 &nbsp;/&nbsp; Present</p>
+      <h3 class="feature-title">Walk the room, not the slides.</h3>
+      <p class="feature-desc">Step through saved scenes and animations live, in front of the client, and answer "what if" questions by simply turning the model.</p>
+    </div>
+    <div class="phone-wrap">
+      <div class="corner-bl"></div>
+      <div class="corner-tr"></div>
+      <!-- Phone mockup: dotted camera path + arrow -->
+      <svg class="phone-svg" viewBox="0 0 160 290" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="8" width="144" height="274" rx="18" fill="#0B2545" stroke="#3A7FA0" stroke-width="1.5"/>
+        <rect x="22" y="28" width="116" height="234" rx="4" fill="#061626"/>
+        <circle cx="80" cy="14" r="3" fill="#3A7FA0"/>
+        <!-- room outline -->
+        <rect x="32" y="44" width="96" height="80" rx="2" fill="none" stroke="#6FD3F5" stroke-width="1" opacity=".4"/>
+        <!-- camera path dots -->
+        <g fill="none">
+          <circle cx="45" cy="145" r="3" fill="#6FD3F5" opacity=".5"/>
+          <circle cx="62" cy="135" r="3" fill="#6FD3F5" opacity=".6"/>
+          <circle cx="80" cy="130" r="4" fill="#FF6A3D"/>
+          <circle cx="98" cy="135" r="3" fill="#6FD3F5" opacity=".6"/>
+          <circle cx="115" cy="145" r="3" fill="#6FD3F5" opacity=".5"/>
+          <!-- path line -->
+          <path d="M45,145 Q62,132 80,130 Q98,128 115,145" stroke="#6FD3F5" stroke-width="1" stroke-dasharray="3,3" fill="none" opacity=".5"/>
+          <!-- arrow head at current position -->
+          <path d="M80,120 L86,133 L80,130 L74,133 Z" fill="#FF6A3D"/>
+        </g>
+        <!-- scene thumbnails at bottom -->
+        <g opacity=".7">
+          <rect x="32" y="165" width="26" height="20" rx="2" fill="none" stroke="#3A7FA0" stroke-width="1"/>
+          <rect x="63" y="165" width="26" height="20" rx="2" fill="none" stroke="#6FD3F5" stroke-width="1.5"/>
+          <rect x="94" y="165" width="26" height="20" rx="2" fill="none" stroke="#3A7FA0" stroke-width="1"/>
+          <!-- active indicator -->
+          <rect x="63" y="162" width="26" height="2" fill="#FF6A3D" rx="1"/>
+        </g>
+        <text x="80" y="210" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#3A7FA0" letter-spacing="1">SCENE 2 / 3</text>
+      </svg>
+    </div>
+  </article>
+
+  <!-- 04 Experience -->
+  <article class="feature-row" aria-label="Feature 04: Experience">
+    <div class="feature-copy">
+      <p class="feature-num">04 &nbsp;/&nbsp; Experience</p>
+      <h3 class="feature-title">Stand inside it, before it's built.</h3>
+      <p class="feature-desc">Place the design at true scale in the actual space, and check how light, proportion, and clearance really feel before anything is built.</p>
+    </div>
+    <div class="phone-wrap">
+      <div class="corner-bl"></div>
+      <div class="corner-tr"></div>
+      <!-- Phone mockup: floor grid + dashed AR placement box -->
+      <svg class="phone-svg" viewBox="0 0 160 290" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="8" width="144" height="274" rx="18" fill="#0B2545" stroke="#3A7FA0" stroke-width="1.5"/>
+        <rect x="22" y="28" width="116" height="234" rx="4" fill="#061626"/>
+        <circle cx="80" cy="14" r="3" fill="#3A7FA0"/>
+        <!-- floor grid perspective -->
+        <g stroke="#3A7FA0" stroke-width=".8" opacity=".6">
+          <line x1="22" y1="200" x2="138" y2="200"/>
+          <line x1="22" y1="215" x2="138" y2="215"/>
+          <line x1="22" y1="230" x2="138" y2="230"/>
+          <line x1="22" y1="245" x2="138" y2="245"/>
+          <!-- verticals (perspective) -->
+          <line x1="40"  y1="195" x2="32"  y2="255"/>
+          <line x1="60"  y1="195" x2="55"  y2="255"/>
+          <line x1="80"  y1="195" x2="80"  y2="255"/>
+          <line x1="100" y1="195" x2="105" y2="255"/>
+          <line x1="120" y1="195" x2="128" y2="255"/>
+        </g>
+        <!-- AR building ghost (dashed) -->
+        <g fill="none" stroke="#FF6A3D" stroke-width="1.5" stroke-dasharray="4,3">
+          <!-- base -->
+          <rect x="50" y="120" width="60" height="80"/>
+          <!-- top -->
+          <rect x="56" y="90" width="48" height="30"/>
+          <!-- connect corners -->
+          <line x1="50" y1="120" x2="56" y2="90"/>
+          <line x1="110" y1="120" x2="104" y2="90"/>
+        </g>
+        <!-- AR reticle center on floor -->
+        <rect x="62" y="195" width="36" height="8" fill="none" stroke="#FF6A3D" stroke-width="1" opacity=".8"/>
+        <text x="80" y="218" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="7" fill="#FF6A3D" letter-spacing="1">PLACE MODEL</text>
+      </svg>
+    </div>
+  </article>
+</section>
+
+<!-- ════════════════════════════ AR BAND ════════════════════════════════ -->
+<section id="ar" aria-label="AR Experience">
+  <div class="reticle" aria-hidden="true">
+    <div class="reticle-corner tl"></div>
+    <div class="reticle-corner tr"></div>
+    <div class="reticle-corner bl"></div>
+    <div class="reticle-corner br"></div>
+    <div class="reticle-ring"></div>
+    <div class="reticle-dot"></div>
+  </div>
+  <h2 class="ar-title">Place it. Walk around it.<br>Believe it.</h2>
+  <p class="ar-sub">Point your phone at the floor, and the model settles into the room at real-world scale — the closest you'll get to standing in the finished space before ground is broken.</p>
+  <button class="cta-primary" id="ar-cta">See it in AR</button>
+</section>
+
+<!-- ════════════════════════════ FOOTER ════════════════════════════════ -->
+<footer id="download">
+  <span class="footer-brand">Blueprint Viewer &nbsp;·&nbsp; Built for the Field</span>
+  <nav class="footer-links" aria-label="Footer links">
+    <a href="raytracer.html" id="link-raytracer" style="color:var(--signal);font-weight:600">⚡ 3D Ray Tracer</a>
+    <a href="#" id="link-appstore">App Store</a>
+    <a href="#" id="link-googleplay">Google Play</a>
+    <a href="#" id="link-docs">Docs</a>
+  </nav>
+</footer>
+
+<script>
+'use strict';
+
+// ─── 3D MODEL ROTATION ────────────────────────────────────────────────────
+
+const model   = document.getElementById('model-3d');
+const scene   = document.getElementById('model-scene');
+const rotXEl  = document.getElementById('rot-x');
+const rotYEl  = document.getElementById('rot-y');
+
+let rotX = 18, rotY = -32;
+let isDragging = false, prevX = 0, prevY = 0;
+let autoRotating = true;
+const AUTO_SPEED = 0.06; // degrees/frame per PRD spec
+
+function updateModel(){
+  // Clamp pitch per spec: ±70°
+  rotX = Math.max(-70, Math.min(70, rotX));
+  model.style.transform = `rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+  rotXEl.textContent = `ROT X \u00A0${rotX >= 0 ? '' : ''}${rotX.toFixed(1)}°`;
+  rotYEl.textContent = `ROT Y ${rotY.toFixed(1)}°`;
+}
+
+function animate(){
+  if(autoRotating && !isDragging){
+    rotY += AUTO_SPEED;
+  }
+  updateModel();
+  requestAnimationFrame(animate);
+}
+
+// Pointer drag (mouse + touch via pointer events)
+scene.addEventListener('pointerdown', e => {
+  isDragging = true;
+  autoRotating = false;
+  prevX = e.clientX;
+  prevY = e.clientY;
+  scene.setPointerCapture(e.pointerId);
+});
+
+scene.addEventListener('pointermove', e => {
+  if(!isDragging) return;
+  const dx = e.clientX - prevX;
+  const dy = e.clientY - prevY;
+  rotY += dx * 0.45;
+  rotX -= dy * 0.45;
+  prevX = e.clientX;
+  prevY = e.clientY;
+});
+
+function endDrag(){
+  if(!isDragging) return;
+  isDragging = false;
+  // Resume auto-rotation after 2s of inactivity
+  setTimeout(() => { autoRotating = true; }, 2000);
+}
+
+scene.addEventListener('pointerup',     endDrag);
+scene.addEventListener('pointercancel', endDrag);
+
+// Keyboard support for the interactive element
+scene.addEventListener('keydown', e => {
+  const STEP = 5;
+  if(e.key === 'ArrowLeft')  { rotY -= STEP; autoRotating = false; updateModel(); }
+  if(e.key === 'ArrowRight') { rotY += STEP; autoRotating = false; updateModel(); }
+  if(e.key === 'ArrowUp')    { rotX -= STEP; autoRotating = false; updateModel(); }
+  if(e.key === 'ArrowDown')  { rotX += STEP; autoRotating = false; updateModel(); }
+});
+
+// Start animation
+animate();
+
+// ─── DIMENSION CALLOUT DRAW-IN ────────────────────────────────────────────
+
+function drawDimensions(){
+  // Animate SVG stroke-dashoffset
+  document.querySelectorAll('.dim-line, .dim-tick, .dim-label').forEach(el => {
+    el.classList.add('drawn');
+  });
+}
+
+// Fire ~1s after load per spec
+window.addEventListener('load', () => {
+  setTimeout(drawDimensions, 1000);
+});
+
+// ─── SCROLL REVEAL (feature rows) ────────────────────────────────────────
+
+const rows = document.querySelectorAll('.feature-row');
+
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  // Skip animation for reduced-motion users
+  rows.forEach(r => r.classList.add('visible'));
+} else {
+  const io = new IntersectionObserver(entries => {
+    // Collect only newly-intersecting rows and stagger them
+    const visible = entries.filter(e => e.isIntersecting);
+    visible.forEach((entry, idx) => {
+      setTimeout(() => {
+        entry.target.classList.add('visible');
+      }, idx * 70); // 70ms stagger per spec
+      io.unobserve(entry.target);
+    });
+  }, { threshold: 0.20 });
+
+  rows.forEach(r => io.observe(r));
+}
+
+// ─── SMOOTH SCROLL FOR NAV LINKS ─────────────────────────────────────────
+
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if(target){ e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+
+// ─── FOCUS RINGS (signal color) ──────────────────────────────────────────
+// Already handled via :focus-visible in CSS
+</script>
+</body>
+</html>

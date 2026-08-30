@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ray Tracer — Build Your Own 3D Renderer</title>
+<meta name="description" content="Interactive browser-based ray tracer demonstrating all 6 milestones: ray casting, sphere intersection, Phong shading, shadows, reflections, and anti-aliasing.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-deep: #061626;
+  --navy: #0B2545;
+  --navy-soft: #12335F;
+  --cyan: #6FD3F5;
+  --cyan-dim: #3A7FA0;
+  --paper: #EAF2F8;
+  --paper-dim: #9FB6CC;
+  --signal: #FF6A3D;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--navy-deep);
+  background-image:
+    linear-gradient(rgba(111,211,245,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(111,211,245,.055) 1px,transparent 1px);
+  background-size:48px 48px;
+  font-family:'IBM Plex Sans',sans-serif;
+  color:var(--paper);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+/* HEADER */
+header{
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  padding:0.85rem 2rem;
+  border-bottom:1px solid var(--cyan-dim);
+  background:rgba(6,22,38,.85);
+  backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:100;
+}
+.logo{width:32px;height:32px;position:relative;flex-shrink:0;display:block}
+.logo-a{position:absolute;inset:0;border:2px solid var(--cyan);transform:rotate(12deg)}
+.logo-b{position:absolute;inset:7px;border:1.5px solid var(--signal);transform:rotate(-8deg)}
+.header-title{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:1.25rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;
+  color:var(--cyan);
+}
+.header-sub{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.65rem;color:var(--paper-dim);
+  letter-spacing:.08em;
+}
+.nav-back-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:0.4rem;
+  padding:0.45rem 1rem;
+  background:var(--navy-soft);
+  border:1px solid var(--cyan-dim);
+  color:var(--cyan);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:0.7rem;
+  letter-spacing:0.08em;
+  text-decoration:none;
+  text-transform:uppercase;
+  transition:all 0.15s;
+}
+.nav-back-btn:hover{
+  background:var(--cyan);
+  color:var(--navy-deep);
+  border-color:var(--cyan);
+  box-shadow:0 0 12px rgba(111,211,245,0.3);
+}
+/* LAYOUT */
+main{
+  display:grid;
+  grid-template-columns:1fr 340px;
+  flex:1;
+  overflow:hidden;
+}
+/* CANVAS AREA */
+.canvas-area{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:2rem;gap:1rem;
+}
+.canvas-wrap{
+  position:relative;
+  border:1px solid var(--cyan-dim);
+}
+.canvas-wrap::before,.canvas-wrap::after{
+  content:'';position:absolute;
+  width:18px;height:18px;
+  border-color:var(--signal);border-style:solid;
+}
+.canvas-wrap::before{top:-2px;left:-2px;border-width:2px 0 0 2px}
+.canvas-wrap::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0}
+#rt{display:block;image-rendering:pixelated;width:512px;height:384px;background:#000}
+.canvas-meta{
+  display:flex;align-items:center;justify-content:space-between;
+  width:512px;
+}
+.canvas-label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.65rem;color:var(--cyan-dim);letter-spacing:.06em;
+}
+.progress-wrap{
+  width:512px;height:3px;
+  background:var(--navy-soft);border-radius:2px;overflow:hidden;
+}
+.progress-bar{height:100%;width:0;background:var(--signal);transition:width .12s}
+.status{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.68rem;color:var(--paper-dim);
+  text-align:center;min-height:1.2em;
+}
+/* CONTROLS */
+.controls{
+  background:var(--navy);
+  border-left:1px solid var(--cyan-dim);
+  padding:1.5rem;
+  overflow-y:auto;
+  display:flex;flex-direction:column;gap:1.5rem;
+}
+.cg-label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.6rem;font-weight:500;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--cyan-dim);
+  margin-bottom:.75rem;
+  padding-bottom:.4rem;
+  border-bottom:1px solid rgba(111,211,245,.18);
+  display:block;
+}
+/* Milestone tabs */
+.m-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.m-tab{
+  background:var(--navy-deep);
+  border:1px solid var(--cyan-dim);
+  color:var(--paper-dim);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.68rem;padding:.55rem .2rem;
+  cursor:pointer;text-align:center;
+  transition:all .15s;line-height:1.4;
+}
+.m-tab:hover{border-color:var(--cyan);color:var(--cyan)}
+.m-tab.active{background:var(--cyan);border-color:var(--cyan);color:var(--navy-deep);font-weight:500}
+/* SPP */
+.spp-row{display:flex;gap:.4rem}
+.spp-btn{
+  flex:1;background:var(--navy-deep);
+  border:1px solid var(--cyan-dim);
+  color:var(--paper-dim);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.75rem;padding:.5rem;
+  cursor:pointer;text-align:center;transition:all .15s;
+}
+.spp-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.spp-btn.active{background:var(--navy-soft);border-color:var(--cyan);color:var(--cyan)}
+/* Render button */
+.render-btn{
+  width:100%;padding:.9rem;
+  background:var(--signal);border:none;
+  color:#fff;
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:1rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;transition:all .15s;
+}
+.render-btn:hover{background:#ff8457;transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,106,61,.4)}
+.render-btn:active{transform:none}
+.render-btn:disabled{background:var(--navy-soft);color:var(--paper-dim);cursor:not-allowed;transform:none;box-shadow:none}
+/* Stats */
+.stat{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.35rem 0;border-bottom:1px solid rgba(111,211,245,.09);
+}
+.stat:last-child{border-bottom:none}
+.stat-k{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--cyan-dim);text-transform:uppercase;letter-spacing:.08em}
+.stat-v{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--paper)}
+/* Info box */
+.info-box{
+  background:var(--navy-deep);
+  border:1px solid rgba(111,211,245,.18);
+  padding:1rem;
+}
+.info-box h3{
+  font-family:'Big Shoulders Display',sans-serif;
+  font-size:.95rem;font-weight:700;
+  text-transform:uppercase;color:var(--cyan);
+  margin-bottom:.5rem;
+}
+.info-box p{font-size:.78rem;line-height:1.65;color:var(--paper-dim)}
+
+@media(max-width:860px){
+  main{grid-template-columns:1fr}
+  #rt{width:320px;height:240px}
+  .canvas-meta,.progress-wrap{width:320px}
+  .controls{border-left:none;border-top:1px solid var(--cyan-dim)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:0.75rem">
+    <a href="index.html" class="logo" title="Back to Blueprint Viewer"><div class="logo-a"></div><div class="logo-b"></div></a>
+    <span class="header-title">Ray Tracer</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;margin-left:auto">
+    <span class="header-sub">BUILD YOUR OWN 3D RENDERER &nbsp;·&nbsp; 6 MILESTONES</span>
+    <a href="3d-scanner.html" class="nav-back-btn" style="color:var(--signal);border-color:var(--signal)">📱 3D Photo Scanner</a>
+    <a href="index.html" class="nav-back-btn">← Blueprint Viewer</a>
+  </div>
+</header>
+
+<main>
+  <div class="canvas-area">
+    <div class="canvas-wrap">
+      <canvas id="rt" width="256" height="192"></canvas>
+    </div>
+    <div class="canvas-meta">
+      <span class="canvas-label">256 × 192 px &nbsp;·&nbsp; 4:3 &nbsp;·&nbsp; 2× CSS SCALE</span>
+      <span class="canvas-label" id="statusInline">READY</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="pb"></div></div>
+    <div class="status" id="statusText">Click Render to begin</div>
+  </div>
+
+  <div class="controls">
+    <div>
+      <span class="cg-label">Milestone</span>
+      <div class="m-tabs">
+        <button class="m-tab" data-m="1">M1<br>Gradient</button>
+        <button class="m-tab" data-m="2">M2<br>Spheres</button>
+        <button class="m-tab active" data-m="3">M3<br>Phong</button>
+        <button class="m-tab" data-m="4">M4<br>Shadows</button>
+        <button class="m-tab" data-m="5">M5<br>Reflect</button>
+        <button class="m-tab" data-m="6">M6<br>SSAA</button>
+      </div>
+    </div>
+
+    <div id="sppGroup" style="display:none">
+      <span class="cg-label">Samples Per Pixel</span>
+      <div class="spp-row">
+        <button class="spp-btn" data-spp="1">1×</button>
+        <button class="spp-btn active" data-spp="4">4×</button>
+        <button class="spp-btn" data-spp="9">9×</button>
+      </div>
+    </div>
+
+    <button class="render-btn" id="renderBtn">▶ &nbsp; Render</button>
+
+    <div>
+      <span class="cg-label">Scene</span>
+      <div class="stat"><span class="stat-k">Resolution</span><span class="stat-v">256 × 192</span></div>
+      <div class="stat"><span class="stat-k">Objects</span><span class="stat-v">4 spheres</span></div>
+      <div class="stat"><span class="stat-k">Lights</span><span class="stat-v">2 sources</span></div>
+      <div class="stat"><span class="stat-k">Max depth</span><span class="stat-v">3 bounces</span></div>
+      <div class="stat"><span class="stat-k">Render time</span><span class="stat-v" id="rtTime">—</span></div>
+      <div class="stat"><span class="stat-k">Rays cast</span><span class="stat-v" id="rtRays">—</span></div>
+    </div>
+
+    <div class="info-box">
+      <h3 id="infoTitle">M3 — Phong Shading</h3>
+      <p id="infoDesc">Local illumination via the Phong model: ambient + diffuse + specular terms. Surfaces facing lights show bright highlights; areas facing away receive only ambient light.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+'use strict';
+
+// ─── DATA STRUCTURES ────────────────────────────────────────────────────────
+
+class Vec3 {
+  constructor(x,y,z){this.x=x;this.y=y;this.z=z}
+  add(v){return new Vec3(this.x+v.x,this.y+v.y,this.z+v.z)}
+  sub(v){return new Vec3(this.x-v.x,this.y-v.y,this.z-v.z)}
+  scale(s){return new Vec3(this.x*s,this.y*s,this.z*s)}
+  dot(v){return this.x*v.x+this.y*v.y+this.z*v.z}
+  mag(){return Math.sqrt(this.dot(this))}
+  norm(){const m=this.mag();return m>0?this.scale(1/m):new Vec3(0,0,0)}
+  neg(){return this.scale(-1)}
+}
+
+class Col {
+  constructor(r,g,b){this.r=r;this.g=g;this.b=b}
+  add(c){return new Col(this.r+c.r,this.g+c.g,this.b+c.b)}
+  scale(s){return new Col(this.r*s,this.g*s,this.b*s)}
+  mul(c){return new Col(this.r*c.r,this.g*c.g,this.b*c.b)}
+  clamp(){return new Col(Math.min(1,Math.max(0,this.r)),Math.min(1,Math.max(0,this.g)),Math.min(1,Math.max(0,this.b)))}
+  toBytes(){const c=this.clamp();return[~~(c.r*255),~~(c.g*255),~~(c.b*255)]}
+}
+
+class Material {
+  constructor(ka,kd,ks,shin,kr){
+    this.ka=ka; // Col ambient
+    this.kd=kd; // Col diffuse
+    this.ks=ks; // Col specular
+    this.shin=shin; // float shininess
+    this.kr=kr; // Col reflectivity
+  }
+}
+
+class Sphere {
+  constructor(center,radius,mat){this.center=center;this.radius=radius;this.mat=mat}
+}
+
+class Light {
+  constructor(pos,id,is){this.pos=pos;this.id=id;this.is=is}
+}
+
+// ─── SCENE ──────────────────────────────────────────────────────────────────
+
+const W=256, H=192, MAX_DEPTH=3;
+const BACKGROUND=new Col(0.04,0.07,0.14);
+
+// Image plane corners per PRD:
+// x1=top-left, x2=top-right, x3=bottom-left, x4=bottom-right
+const IP={
+  x1:new Vec3(1,0.75,0),
+  x2:new Vec3(-1,0.75,0),
+  x3:new Vec3(1,-0.75,0),
+  x4:new Vec3(-1,-0.75,0)
+};
+const CAM=new Vec3(0,0,-1);
+
+const SPHERES=[
+  // Ground sphere — large, acts as floor; top at y≈-1 at z≈5
+  new Sphere(new Vec3(0,-102,5),100,new Material(
+    new Col(0.04,0.04,0.05),
+    new Col(0.25,0.27,0.32),
+    new Col(0.12,0.12,0.15),
+    10,
+    new Col(0.04,0.04,0.06)
+  )),
+  // Red sphere — center-left on screen (world +x)
+  new Sphere(new Vec3(0.3,0.2,4.5),1.0,new Material(
+    new Col(0.10,0.02,0.02),
+    new Col(0.75,0.10,0.08),
+    new Col(1.0,0.90,0.90),
+    64,
+    new Col(0.0,0.0,0.0)
+  )),
+  // Blue sphere — right on screen (world -x)
+  new Sphere(new Vec3(-1.8,0.0,4.2),0.9,new Material(
+    new Col(0.02,0.02,0.10),
+    new Col(0.10,0.15,0.82),
+    new Col(0.90,0.90,1.0),
+    48,
+    new Col(0.0,0.0,0.0)
+  )),
+  // Mirror sphere — front-center; clearly reflective
+  new Sphere(new Vec3(0,0.0,2.9),0.70,new Material(
+    new Col(0.05,0.05,0.05),
+    new Col(0.08,0.08,0.08),
+    new Col(1.0,1.0,1.0),
+    200,
+    new Col(0.92,0.88,0.84)
+  ))
+];
+
+// Light 1: right-side, same y as spheres — creates sphere-on-sphere shadow
+// Light 2: upper-left fill
+const LIGHTS=[
+  new Light(new Vec3(8,1.5,2),new Col(0.95,0.82,0.70),new Col(1.0,1.0,0.92)),
+  new Light(new Vec3(-4,8,4),new Col(0.35,0.42,0.75),new Col(0.65,0.72,1.0))
+];
+const AMBIENT=new Col(0.10,0.10,0.15);
+
+// ─── MILESTONE INFO ──────────────────────────────────────────────────────────
+
+const MINFO={
+  1:{t:'M1 — Casting Rays',d:'Camera rays are cast through every pixel on the image plane using bilinear interpolation. The debug output maps the ray\'s X direction component to the red channel and Y to green, with a constant blue — revealing the smooth angular distribution of rays across the frame.'},
+  2:{t:'M2 — Sphere Intersection',d:'Each ray is tested against all spheres using the quadratic ray–sphere intersection formula. The closest positive-t hit (t ≥ 1 past the image plane) is found, and the pixel is painted that sphere\'s flat diffuse color. No lighting yet — just silhouettes with correct depth ordering.'},
+  3:{t:'M3 — Phong Shading',d:'Surfaces are shaded with the Phong reflectance model: ambient + diffuse (k_d · i_d · (N̂·L̂)) + specular (k_s · i_s · (V̂·R̂)^α). Each light contributes independently. Highlights are view-angle dependent; areas facing away from all lights receive only ambient.'},
+  4:{t:'M4 — Shadow Rays',d:'For each lit surface point, a shadow ray is cast toward each light using direction (lightPos − p). An intersection at 0 < t < 1 means the path is blocked. That light\'s diffuse + specular contribution is excluded. Ambient always remains, so shadows are dark but non-black.'},
+  5:{t:'M5 — Reflections',d:'The mirror sphere\'s k_r coefficient enables recursive tracing. At each intersection, a reflected ray R̂ = 2(N̂·V̂)N̂ − V̂ is cast and traced up to 3 bounces deep. The returned color is multiplied by k_r and added to the local Phong result, producing visible mirror reflections.'},
+  6:{t:'M6 — Anti-Aliasing (SSAA)',d:'Instead of one center ray per pixel, N×N sub-pixel sample rays are distributed on a regular grid within each pixel\'s boundary. All N² colors are averaged. This smooths jagged silhouette edges at the cost of N× more trace work. Try 1× vs 9× to see the difference.'}
+};
+
+// ─── RAY–SPHERE INTERSECTION ─────────────────────────────────────────────────
+
+// Returns smallest t ≥ tMin, or null
+function intersect(ro,rd,sphere,tMin){
+  const cp=ro.sub(sphere.center);
+  const a=rd.dot(rd);
+  const b=2*cp.dot(rd);
+  const c=cp.dot(cp)-sphere.radius*sphere.radius;
+  const disc=b*b-4*a*c;
+  if(disc<0)return null;
+  const sq=Math.sqrt(disc);
+  const t1=(-b-sq)/(2*a);
+  const t2=(-b+sq)/(2*a);
+  if(t1>=tMin)return t1;
+  if(t2>=tMin)return t2;
+  return null;
+}
+
+// Find closest hit among all spheres
+function closestHit(ro,rd,tMin){
+  let minT=Infinity,hit=null;
+  for(const s of SPHERES){
+    const t=intersect(ro,rd,s,tMin);
+    if(t!==null&&t<minT){minT=t;hit=s}
+  }
+  return hit?{sphere:hit,t:minT}:null;
+}
+
+// ─── TRACE ───────────────────────────────────────────────────────────────────
+
+function trace(ro,rd,depth,m,tMin){
+  const h=closestHit(ro,rd,tMin);
+  if(!h)return BACKGROUND;
+
+  const{sphere,t}=h;
+
+  // M2: flat color only
+  if(m<=2)return sphere.mat.kd;
+
+  // Intersection point + surface normal
+  const p=ro.add(rd.scale(t));
+  const N=p.sub(sphere.center).norm();
+  const mat=sphere.mat;
+
+  // Ambient
+  let color=mat.ka.mul(AMBIENT);
+
+  for(const light of LIGHTS){
+    // M4: shadow test — direction (lightPos − p), t=1 is the light
+    if(m>=4){
+      const shadowDir=light.pos.sub(p);
+      let blocked=false;
+      for(const s of SPHERES){
+        if(s===sphere)continue; // exclude self per PRD
+        const st=intersect(p,shadowDir,s,1e-4);
+        if(st!==null&&st<1.0){blocked=true;break}
+      }
+      if(blocked)continue;
+    }
+
+    const L=light.pos.sub(p).norm();
+    const NdL=N.dot(L);
+    if(NdL<=0)continue;
+
+    // Diffuse
+    color=color.add(mat.kd.mul(light.id).scale(NdL));
+
+    // Specular
+    const V=CAM.sub(p).norm();
+    const R=N.scale(2*NdL).sub(L);
+    const VdR=Math.max(0,V.dot(R));
+    color=color.add(mat.ks.mul(light.is).scale(Math.pow(VdR,mat.shin)));
+  }
+
+  // M5: recursive reflection
+  if(m>=5&&depth>0){
+    const V=rd.norm().neg();
+    const NdV=N.dot(V);
+    if(NdV>0){
+      const Rdir=N.scale(2*NdV).sub(V);
+      const rc=trace(p,Rdir,depth-1,m,1e-4);
+      color=color.add(mat.kr.mul(rc));
+    }
+  }
+
+  return color.clamp();
+}
+
+// ─── PIXEL RENDERER ──────────────────────────────────────────────────────────
+
+function renderPixel(px,py,milestone,spp){
+  // M1: ray-direction debug gradient
+  if(milestone===1){
+    const alpha=1-(px+0.5)/W;
+    const beta=(py+0.5)/H;
+    const t=IP.x1.scale(1-alpha).add(IP.x2.scale(alpha));
+    const b=IP.x3.scale(1-alpha).add(IP.x4.scale(alpha));
+    const pl=t.scale(1-beta).add(b.scale(beta));
+    const dir=pl.sub(CAM);
+    // Map x ∈ [-1,1]→[0,1], y ∈ [-0.75,0.75]→[0,1]
+    return{r:(dir.x+1)/2,g:(dir.y+0.75)/1.5,b:0.6,rays:1};
+  }
+
+  // M2–M6: full trace
+  const side=(milestone===6)?Math.round(Math.sqrt(spp)):1;
+  const cnt=side*side;
+  let R=0,G=0,B=0;
+
+  for(let si=0;si<side;si++){
+    for(let sj=0;sj<side;sj++){
+      const da=(si+0.5)/side;
+      const db=(sj+0.5)/side;
+      // alpha increases right-to-left in world (x1 at alpha=0 is world-right)
+      // We flip: alpha=0 → world x=1 (right), alpha=1 → world x=-1 (left)
+      const alpha=1-(px+da)/W;
+      const beta=(py+db)/H;
+      const tp=IP.x1.scale(1-alpha).add(IP.x2.scale(alpha));
+      const bp=IP.x3.scale(1-alpha).add(IP.x4.scale(alpha));
+      const pl=tp.scale(1-beta).add(bp.scale(beta));
+      const dir=pl.sub(CAM);
+      // Primary ray tMin = 1.0 per PRD (past image plane)
+      const c=trace(pl,dir,MAX_DEPTH,milestone,1.0);
+      R+=c.r;G+=c.g;B+=c.b;
+    }
+  }
+
+  return{r:R/cnt,g:G/cnt,b:B/cnt,rays:cnt};
+}
+
+// ─── ASYNC RENDER LOOP ───────────────────────────────────────────────────────
+
+const canvas=document.getElementById('rt');
+const ctx=canvas.getContext('2d');
+let rendering=false,abortFlag=false;
+let curM=3,curSpp=4;
+
+async function startRender(){
+  if(rendering){abortFlag=true;return}
+  rendering=true;abortFlag=false;
+
+  document.getElementById('renderBtn').textContent='■  Stop';
+  document.getElementById('pb').style.width='0%';
+  document.getElementById('rtTime').textContent='…';
+  document.getElementById('rtRays').textContent='…';
+
+  const img=ctx.createImageData(W,H);
+  const d=img.data;
+  const t0=performance.now();
+  let totalRays=0;
+  const CHUNK=6;
+
+  for(let j=0;j<H;j+=CHUNK){
+    if(abortFlag)break;
+
+    for(let dj=0;dj<CHUNK&&j+dj<H;dj++){
+      const row=j+dj;
+      for(let i=0;i<W;i++){
+        const{r,g,b,rays}=renderPixel(i,row,curM,curSpp);
+        totalRays+=rays;
+        const idx=(row*W+i)*4;
+        d[idx]=Math.min(255,~~(r*255));
+        d[idx+1]=Math.min(255,~~(g*255));
+        d[idx+2]=Math.min(255,~~(b*255));
+        d[idx+3]=255;
+      }
+    }
+    ctx.putImageData(img,0,0);
+
+    const pct=Math.min(100,((j+CHUNK)/H)*100);
+    document.getElementById('pb').style.width=pct+'%';
+    document.getElementById('statusText').textContent=
+      `Rendering row ${Math.min(j+CHUNK,H)} / ${H}  ·  ${totalRays.toLocaleString()} rays cast`;
+    document.getElementById('statusInline').textContent=~~pct+'%';
+    document.getElementById('rtRays').textContent=totalRays.toLocaleString();
+
+    await new Promise(r=>setTimeout(r,0));
+  }
+
+  const elapsed=((performance.now()-t0)/1000).toFixed(2);
+  document.getElementById('rtTime').textContent=elapsed+'s';
+  document.getElementById('rtRays').textContent=totalRays.toLocaleString();
+  document.getElementById('pb').style.width='100%';
+
+  if(!abortFlag){
+    document.getElementById('statusText').textContent=
+      `Done — ${elapsed}s · ${totalRays.toLocaleString()} rays`;
+    document.getElementById('statusInline').textContent='DONE';
+  }else{
+    document.getElementById('statusText').textContent='Render cancelled';
+    document.getElementById('statusInline').textContent='STOPPED';
+  }
+
+  rendering=false;
+  document.getElementById('renderBtn').textContent='▶  Render';
+}
+
+// ─── UI WIRING ────────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.m-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.m-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    curM=+btn.dataset.m;
+    document.getElementById('sppGroup').style.display=curM===6?'block':'none';
+    const inf=MINFO[curM];
+    document.getElementById('infoTitle').textContent=inf.t;
+    document.getElementById('infoDesc').textContent=inf.d;
+  });
+});
+
+document.querySelectorAll('.spp-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.spp-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    curSpp=+btn.dataset.spp;
+  });
+});
+
+document.getElementById('renderBtn').addEventListener('click',startRender);
+
+// Keyboard shortcut: R to render
+document.addEventListener('keydown',e=>{
+  if(e.key==='r'||e.key==='R')startRender();
+});
+</script>
+</body>
+</html>

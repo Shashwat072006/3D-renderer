@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Photo Scanner & Renderer — Blueprint Studio</title>
+<meta name="description" content="Instant 2D-to-3D photo reconstruction and real-time interactive 3D rendering. Connect your phone camera to take photos and render in 3D automatically.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Three.js for high-performance 3D WebGL rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<!-- QRCode generator library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --navy-deep: #061626;
+  --navy: #0B2545;
+  --navy-soft: #12335F;
+  --cyan: #6FD3F5;
+  --cyan-dim: #3A7FA0;
+  --paper: #EAF2F8;
+  --paper-dim: #9FB6CC;
+  --signal: #FF6A3D;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--navy-deep);
+  background-image:
+    linear-gradient(rgba(111,211,245,.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111,211,245,.055) 1px, transparent 1px);
+  background-size: 48px 48px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: var(--paper);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.85rem 2rem;
+  background: rgba(6, 22, 38, 0.92);
+  border-bottom: 1px solid var(--cyan-dim);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+}
+.logo { width: 32px; height: 32px; position: relative; flex-shrink: 0; }
+.logo-a { position: absolute; inset: 0; border: 2px solid var(--cyan); transform: rotate(12deg); }
+.logo-b { position: absolute; inset: 7px; border: 1.5px solid var(--signal); transform: rotate(-8deg); }
+.header-title {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 1.35rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cyan);
+}
+.header-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem; color: var(--paper-dim);
+  letter-spacing: 0.08em;
+}
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.btn-connect-phone {
+  background: var(--signal);
+  color: #fff;
+  border: none;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.55rem 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.15s;
+}
+.btn-connect-phone:hover {
+  background: #ff8457;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(255, 106, 61, 0.4);
+}
+.nav-link-btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem; color: var(--paper-dim);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  text-decoration: none;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(111,211,245,0.25);
+  background: var(--navy-soft);
+  transition: all 0.15s;
+}
+.nav-link-btn:hover {
+  color: var(--cyan); border-color: var(--cyan);
+}
+
+/* MAIN LAYOUT */
+main {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 3D VIEWPORT */
+#viewport-container {
+  position: relative;
+  width: 100%; height: 100%;
+  background: radial-gradient(circle at center, #0B2545 0%, #061626 80%);
+}
+#threejs-canvas {
+  width: 100%; height: 100%;
+  display: block;
+}
+
+/* HUD OVERLAYS */
+.viewport-hud {
+  position: absolute;
+  top: 1.5rem; left: 1.5rem;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.hud-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--cyan);
+  background: rgba(6, 22, 38, 0.85);
+  border: 1px solid var(--cyan-dim);
+  padding: 0.4rem 0.75rem;
+  width: fit-content;
+  backdrop-filter: blur(4px);
+}
+.live-indicator {
+  display: inline-flex; align-items: center; gap: 0.4rem; color: var(--signal); font-weight: 600;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--signal);
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse { 0%{opacity:1} 50%{opacity:0.3} 100%{opacity:1} }
+
+.viewport-instructions {
+  position: absolute;
+  bottom: 1.5rem; left: 1.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem; color: var(--paper-dim);
+  background: rgba(6, 22, 38, 0.75);
+  padding: 0.5rem 0.85rem;
+  border-left: 2px solid var(--cyan);
+  pointer-events: none;
+}
+
+/* SCANNING NOTIFICATION OVERLAY */
+.scan-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(111, 211, 245, 0.15);
+  border: 3px solid var(--cyan);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-flash.active {
+  opacity: 1;
+}
+.scan-flash-text {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 2.2rem; font-weight: 800;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--cyan);
+  background: rgba(6, 22, 38, 0.9);
+  padding: 1rem 2rem;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 40px rgba(111, 211, 245, 0.4);
+}
+
+/* SIDEBAR CONTROLS */
+.sidebar {
+  background: var(--navy);
+  border-left: 1px solid var(--cyan-dim);
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--cyan-dim);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(111, 211, 245, 0.18);
+  display: block;
+}
+
+/* RENDER MODE BUTTONS */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.mode-btn {
+  background: var(--navy-deep);
+  border: 1px solid var(--cyan-dim);
+  color: var(--paper-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  padding: 0.6rem 0.4rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.mode-btn:hover {
+  border-color: var(--cyan); color: var(--cyan);
+}
+.mode-btn.active {
+  background: var(--cyan);
+  color: var(--navy-deep);
+  border-color: var(--cyan);
+  font-weight: 600;
+}
+
+/* SLIDERS */
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem; color: var(--paper-dim);
+}
+.slider-header span.val { color: var(--cyan); font-weight: 600; }
+input[type="range"] {
+  accent-color: var(--signal);
+  cursor: pointer;
+}
+
+/* PREVIEW THUMBNAIL */
+.preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.thumb-wrap {
+  width: 100%;
+  height: 120px;
+  background: var(--navy-deep);
+  border: 1px solid rgba(111, 211, 245, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+.thumb-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.thumb-timestamp {
+  position: absolute; bottom: 4px; right: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  background: rgba(6, 22, 38, 0.85);
+  color: var(--cyan);
+  padding: 2px 5px;
+}
+
+/* DEMO PRESETS */
+.preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+.preset-btn {
+  background: var(--navy-deep);
+  border: 1px solid rgba(111, 211, 245, 0.25);
+  color: var(--paper-dim);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  padding: 0.5rem 0.2rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.preset-btn:hover { border-color: var(--signal); color: var(--signal); }
+
+/* EXPORT BUTTON */
+.btn-export {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--navy-soft);
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 1rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-export:hover {
+  background: var(--cyan);
+  color: var(--navy-deep);
+  box-shadow: 0 0 15px rgba(111, 211, 245, 0.35);
+}
+
+/* MODAL: QR CODE PAIRING */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(6, 22, 38, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.modal-backdrop.open { display: flex; }
+.modal-card {
+  background: var(--navy);
+  border: 1px solid var(--cyan);
+  max-width: 480px; width: 100%;
+  padding: 2rem;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: center;
+}
+.modal-close {
+  position: absolute; top: 1rem; right: 1.25rem;
+  background: none; border: none;
+  color: var(--paper-dim); font-size: 1.5rem;
+  cursor: pointer;
+}
+.modal-close:hover { color: var(--signal); }
+.modal-title {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 1.6rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cyan);
+  text-align: center;
+}
+.modal-desc {
+  font-size: 0.85rem; line-height: 1.6;
+  color: var(--paper-dim); text-align: center;
+}
+.qr-container {
+  background: #fff;
+  padding: 1rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qr-url-box {
+  width: 100%;
+  background: var(--navy-deep);
+  border: 1px solid var(--cyan-dim);
+  padding: 0.6rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.qr-url-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem; color: var(--signal);
+  word-break: break-all;
+}
+.copy-btn {
+  background: var(--navy-soft);
+  border: 1px solid var(--cyan-dim);
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.copy-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+@media(max-width: 860px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .sidebar { border-left: none; border-top: 1px solid var(--cyan-dim); max-height: 280px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-a"></div><div class="logo-b"></div></div>
+  <div>
+    <span class="header-title">3D Photo Reconstruction &amp; Renderer</span>
+    <span class="header-sub" style="display:block">MONOCULAR DEPTH ESTIMATION &nbsp;·&nbsp; REAL-TIME 3D RECONSTRUCTION</span>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn-connect-phone" id="btnOpenPhoneModal">
+      <span>📱</span> Connect Phone
+    </button>
+    <a href="index.html" class="nav-link-btn">← Blueprint Viewer</a>
+    <a href="raytracer.html" class="nav-link-btn">⚡ 3D Ray Tracer</a>
+  </div>
+</header>
+
+<main>
+  <!-- 3D WebGL Viewport -->
+  <div id="viewport-container">
+    <div id="threejs-canvas"></div>
+
+    <div class="viewport-hud">
+      <div class="hud-badge">
+        <span class="live-indicator"><span class="live-dot"></span> LIVE SYNC:</span>
+        <span id="syncStatus">LISTENING FOR PHONE PHOTOS</span>
+      </div>
+      <div class="hud-badge" id="meshStats">MESH: 128 × 128 &nbsp;·&nbsp; 32,768 POLYGONS</div>
+    </div>
+
+    <div class="viewport-instructions">
+      🖱️ <b>Left Click + Drag:</b> Orbit 360° &nbsp;·&nbsp; <b>Scroll:</b> Zoom &nbsp;·&nbsp; <b>Right Click + Drag:</b> Pan
+    </div>
+
+    <div class="scan-flash" id="scanFlash">
+      <div class="scan-flash-text">⚡ INCOMING PHOTO FROM PHONE — RECONSTRUCTING 3D...</div>
+    </div>
+  </div>
+
+  <!-- Sidebar Controls -->
+  <div class="sidebar">
+    <!-- Active Photo Preview -->
+    <div class="preview-box">
+      <span class="section-label">Source Photo</span>
+      <div class="thumb-wrap">
+        <img id="sourcePhotoImg" src="" alt="Source Photo">
+        <span class="thumb-timestamp" id="photoTime">DEMO SCENE</span>
+      </div>
+      <label style="display:block;margin-top:0.4rem">
+        <input type="file" id="localUploadInput" accept="image/*" style="display:none">
+        <div class="nav-link-btn" style="text-align:center;cursor:pointer;background:var(--navy-deep)">📁 Upload Local Image</div>
+      </label>
+    </div>
+
+    <!-- Render Modes -->
+    <div>
+      <span class="section-label">3D Render Mode</span>
+      <div class="mode-grid">
+        <button class="mode-btn active" data-mode="textured">Textured 3D</button>
+        <button class="mode-btn" data-mode="wireframe">Blueprint Mesh</button>
+        <button class="mode-btn" data-mode="phong">Phong Clay</button>
+        <button class="mode-btn" data-mode="normals">Surface Normals</button>
+      </div>
+    </div>
+
+    <!-- 3D Geometry Controls -->
+    <div>
+      <span class="section-label">Depth &amp; Geometry</span>
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>Depth Extrusion (Z)</span>
+          <span class="val" id="valDepth">1.50×</span>
+        </div>
+        <input type="range" id="sliderDepth" min="0" max="4.0" step="0.05" value="1.50">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>Smoothness Filter</span>
+          <span class="val" id="valSmooth">2.0</span>
+        </div>
+        <input type="range" id="sliderSmooth" min="0" max="6" step="1" value="2">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>Lighting Angle</span>
+          <span class="val" id="valLight">45°</span>
+        </div>
+        <input type="range" id="sliderLight" min="0" max="360" step="5" value="45">
+      </div>
+    </div>
+
+    <!-- Demo Presets -->
+    <div>
+      <span class="section-label">Sample 3D Scans</span>
+      <div class="preset-row">
+        <button class="preset-btn" data-preset="building">Building</button>
+        <button class="preset-btn" data-preset="room">Room</button>
+        <button class="preset-btn" data-preset="sculpture">Sculpture</button>
+        <button class="preset-btn" data-preset="terrain">Terrain</button>
+      </div>
+    </div>
+
+    <!-- Export Button -->
+    <button class="btn-export" id="btnExportObj">💾 Export 3D (.OBJ)</button>
+  </div>
+</main>
+
+<!-- QR Code Phone Pairing Modal -->
+<div class="modal-backdrop" id="phoneModal">
+  <div class="modal-card">
+    <button class="modal-close" id="btnCloseModal">×</button>
+    <h3 class="modal-title">📱 Connect Phone Camera</h3>
+    <p class="modal-desc">
+      Scan this QR code with your phone (on the same Wi-Fi) or open the URL. Tap <b>📸 Capture</b> on your phone to instantly reconstruct it here in 3D!
+    </p>
+
+    <div class="qr-container" id="qrCodeTarget"></div>
+
+    <div class="qr-url-box">
+      <span class="qr-url-text" id="phoneUrlText">Loading connection URL...</span>
+      <button class="copy-btn" id="btnCopyUrl">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── THREE.JS 3D SCENE SETUP ──────────────────────────────────────────────
+
+const container = document.getElementById('threejs-canvas');
+let scene, camera, renderer, controls;
+let mesh = null, geometry = null, material = null;
+let currentTexture = null;
+let currentDepthMap = null;
+let pointLight, ambientLight, dirLight;
+
+const GRID_SIZE = 128; // 128x128 = 16,384 vertices, 32,768 triangles
+
+function initThree() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x061626);
+
+  camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+  camera.position.set(0, 0, 3.5);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Orbit Controls
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.rotateSpeed = 0.8;
+  controls.minDistance = 1.0;
+  controls.maxDistance = 10.0;
+
+  // Lights
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambientLight);
+
+  dirLight = new THREE.DirectionalLight(0x6FD3F5, 0.8);
+  dirLight.position.set(2, 3, 4);
+  scene.add(dirLight);
+
+  pointLight = new THREE.PointLight(0xFF6A3D, 1.2, 10);
+  pointLight.position.set(-2, 1.5, 2.5);
+  scene.add(pointLight);
+
+  // Responsive resize
+  window.addEventListener('resize', onWindowResize);
+
+  animate();
+}
+
+function onWindowResize() {
+  if (!camera || !renderer) return;
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ─── 2D-TO-3D MONOCULAR DEPTH ESTIMATION ALGORITHM ────────────────────────
+
+function computeDepthAndNormals(imageElement) {
+  const canvas = document.createElement('canvas');
+  canvas.width = GRID_SIZE;
+  canvas.height = GRID_SIZE;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(imageElement, 0, 0, GRID_SIZE, GRID_SIZE);
+
+  const imgData = ctx.getImageData(0, 0, GRID_SIZE, GRID_SIZE);
+  const data = imgData.data;
+
+  // 1. Calculate luminance map
+  const depth = new Float32Array(GRID_SIZE * GRID_SIZE);
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255.0;
+    const g = data[i + 1] / 255.0;
+    const b = data[i + 2] / 255.0;
+    // Standard perceptual luminance
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    depth[i / 4] = lum;
+  }
+
+  // 2. Multi-pass smoothing filter (Gaussian/Box approximation)
+  const smoothPasses = parseInt(document.getElementById('sliderSmooth').value, 10);
+  let smoothed = depth;
+  for (let pass = 0; pass < smoothPasses; pass++) {
+    const temp = new Float32Array(GRID_SIZE * GRID_SIZE);
+    for (let y = 0; y < GRID_SIZE; y++) {
+      for (let x = 0; x < GRID_SIZE; x++) {
+        let sum = 0, count = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+              sum += smoothed[ny * GRID_SIZE + nx];
+              count++;
+            }
+          }
+        }
+        temp[y * GRID_SIZE + x] = sum / count;
+      }
+    }
+    smoothed = temp;
+  }
+
+  // Normalize depth [0, 1]
+  let minD = Infinity, maxD = -Infinity;
+  for (let i = 0; i < smoothed.length; i++) {
+    if (smoothed[i] < minD) minD = smoothed[i];
+    if (smoothed[i] > maxD) maxD = smoothed[i];
+  }
+  const range = (maxD - minD) || 1;
+  for (let i = 0; i < smoothed.length; i++) {
+    smoothed[i] = (smoothed[i] - minD) / range;
+  }
+
+  return smoothed;
+}
+
+// ─── BUILD 3D MESH FROM SOURCE PHOTO ──────────────────────────────────────
+
+let activeRenderMode = 'textured';
+
+function reconstruct3D(imageSource) {
+  const img = new Image();
+  img.crossOrigin = 'Anonymous';
+  img.onload = () => {
+    document.getElementById('sourcePhotoImg').src = img.src;
+
+    // Estimate depth
+    currentDepthMap = computeDepthAndNormals(img);
+
+    // Create Three.js Texture
+    if (currentTexture) currentTexture.dispose();
+    currentTexture = new THREE.Texture(img);
+    currentTexture.needsUpdate = true;
+
+    buildMesh();
+  };
+  img.src = imageSource;
+}
+
+function buildMesh() {
+  if (!currentDepthMap) return;
+
+  if (mesh) {
+    scene.remove(mesh);
+    geometry.dispose();
+    material.dispose();
+  }
+
+  const depthScale = parseFloat(document.getElementById('sliderDepth').value);
+
+  // Plane geometry
+  const width = 2.0;
+  const height = 2.0;
+  geometry = new THREE.PlaneGeometry(width, height, GRID_SIZE - 1, GRID_SIZE - 1);
+
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    // Invert Y in texture space vs 3D plane
+    const z = currentDepthMap[i] * depthScale * 0.45;
+    pos.setZ(i, z);
+  }
+
+  geometry.computeVertexNormals();
+
+  // Create material based on active mode
+  applyMaterialMode(activeRenderMode);
+
+  mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+function applyMaterialMode(mode) {
+  activeRenderMode = mode;
+  if (!geometry) return;
+
+  if (material) material.dispose();
+
+  switch (mode) {
+    case 'textured':
+      material = new THREE.MeshStandardMaterial({
+        map: currentTexture,
+        roughness: 0.35,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+      break;
+
+    case 'wireframe':
+      material = new THREE.MeshBasicMaterial({
+        color: 0x6FD3F5,
+        wireframe: true,
+        side: THREE.DoubleSide
+      });
+      break;
+
+    case 'phong':
+      material = new THREE.MeshPhongMaterial({
+        color: 0x9FB6CC,
+        shininess: 80,
+        specular: 0xffffff,
+        side: THREE.DoubleSide
+      });
+      break;
+
+    case 'normals':
+      material = new THREE.MeshNormalMaterial({
+        side: THREE.DoubleSide
+      });
+      break;
+  }
+
+  if (mesh) mesh.material = material;
+}
+
+// ─── DEMO PROCEDURAL PRESETS ──────────────────────────────────────────────
+
+function generateProceduralScene(type) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext('2d');
+
+  if (type === 'building') {
+    ctx.fillStyle = '#0B2545';
+    ctx.fillRect(0, 0, 512, 512);
+    // Skyscraper architectural facade
+    ctx.fillStyle = '#6FD3F5';
+    for (let r = 0; r < 8; r++) {
+      for (let col = 0; col < 6; col++) {
+        ctx.fillStyle = (r + col) % 3 === 0 ? '#FF6A3D' : '#6FD3F5';
+        ctx.fillRect(40 + col * 75, 40 + r * 55, 55, 38);
+      }
+    }
+  } else if (type === 'room') {
+    ctx.fillStyle = '#12335F';
+    ctx.fillRect(0, 0, 512, 512);
+    // Isometric interior perspective
+    ctx.strokeStyle = '#6FD3F5';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(80, 80, 350, 350);
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(80, 80);
+    ctx.moveTo(512, 0); ctx.lineTo(430, 80);
+    ctx.moveTo(0, 512); ctx.lineTo(80, 430);
+    ctx.moveTo(512, 512); ctx.lineTo(430, 430);
+    ctx.stroke();
+    // Center object
+    ctx.fillStyle = '#FF6A3D';
+    ctx.beginPath();
+    ctx.arc(256, 256, 70, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 'sculpture') {
+    ctx.fillStyle = '#061626';
+    ctx.fillRect(0, 0, 512, 512);
+    // Gradient torus/sphere
+    const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 200);
+    grad.addColorStop(0, '#FFFFFF');
+    grad.addColorStop(0.3, '#6FD3F5');
+    grad.addColorStop(0.7, '#12335F');
+    grad.addColorStop(1, '#061626');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(256, 256, 200, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Terrain heightmap
+    ctx.fillStyle = '#061626';
+    ctx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * 512, y = Math.random() * 512, r = 40 + Math.random() * 120;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(111,211,245,0.4)');
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  reconstruct3D(c.toDataURL('image/jpeg', 0.9));
+}
+
+// ─── LIVE SSE PHOTO SYNC FROM PHONE ───────────────────────────────────────
+
+function initLiveSync() {
+  if (!window.EventSource) return;
+
+  const es = new EventSource('/api/events');
+  const syncStatus = document.getElementById('syncStatus');
+
+  es.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'connected') {
+        syncStatus.textContent = 'PHONE SYNC ACTIVE';
+      } else if (msg.type === 'new_photo') {
+        // Trigger incoming photo flash animation
+        const flash = document.getElementById('scanFlash');
+        flash.classList.add('active');
+        setTimeout(() => flash.classList.remove('active'), 1800);
+
+        document.getElementById('photoTime').textContent = new Date(msg.timestamp).toLocaleTimeString();
+        syncStatus.textContent = 'PHOTO RECEIVED & RECONSTRUCTED';
+
+        reconstruct3D(msg.image);
+      }
+    } catch (e) {
+      console.warn('SSE Parse error:', e);
+    }
+  };
+
+  es.onerror = () => {
+    syncStatus.textContent = 'RECONNECTING LIVE SYNC...';
+  };
+}
+
+// ─── QR CODE & PHONE PAIRING ──────────────────────────────────────────────
+
+async function initPhonePairing() {
+  try {
+    const res = await fetch('/api/ip');
+    const data = await res.json();
+
+    const targetUrl = data.cameraUrl;
+    document.getElementById('phoneUrlText').textContent = targetUrl;
+
+    // Generate QR Code
+    const qrTarget = document.getElementById('qrCodeTarget');
+    qrTarget.innerHTML = '';
+    new QRCode(qrTarget, {
+      text: targetUrl,
+      width: 180,
+      height: 180,
+      colorDark: '#061626',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch (err) {
+    document.getElementById('phoneUrlText').textContent = `${window.location.origin}/camera.html`;
+  }
+}
+
+// Modal controls
+const modal = document.getElementById('phoneModal');
+document.getElementById('btnOpenPhoneModal').addEventListener('click', () => {
+  modal.classList.add('open');
+});
+document.getElementById('btnCloseModal').addEventListener('click', () => {
+  modal.classList.remove('open');
+});
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) modal.classList.remove('open');
+});
+document.getElementById('btnCopyUrl').addEventListener('click', () => {
+  const url = document.getElementById('phoneUrlText').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    document.getElementById('btnCopyUrl').textContent = 'Copied!';
+    setTimeout(() => { document.getElementById('btnCopyUrl').textContent = 'Copy'; }, 2000);
+  });
+});
+
+// ─── UI CONTROLS ──────────────────────────────────────────────────────────
+
+// Mode buttons
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyMaterialMode(btn.dataset.mode);
+  });
+});
+
+// Sliders
+document.getElementById('sliderDepth').addEventListener('input', (e) => {
+  document.getElementById('valDepth').textContent = `${parseFloat(e.target.value).toFixed(2)}×`;
+  buildMesh();
+});
+
+document.getElementById('sliderSmooth').addEventListener('input', (e) => {
+  document.getElementById('valSmooth').textContent = e.target.value;
+  const currentImg = document.getElementById('sourcePhotoImg');
+  if (currentImg.src) {
+    currentDepthMap = computeDepthAndNormals(currentImg);
+    buildMesh();
+  }
+});
+
+document.getElementById('sliderLight').addEventListener('input', (e) => {
+  const deg = parseFloat(e.target.value);
+  document.getElementById('valLight').textContent = `${deg}°`;
+  const rad = (deg * Math.PI) / 180;
+  dirLight.position.set(Math.cos(rad) * 4, 3, Math.sin(rad) * 4);
+  pointLight.position.set(-Math.cos(rad) * 3, 1.5, Math.sin(rad) * 3);
+});
+
+// Preset Buttons
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('photoTime').textContent = `PRESET: ${btn.dataset.preset.toUpperCase()}`;
+    generateProceduralScene(btn.dataset.preset);
+  });
+});
+
+// Local file upload
+document.getElementById('localUploadInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('photoTime').textContent = 'LOCAL UPLOAD';
+    reconstruct3D(ev.target.result);
+  };
+  reader.readAsDataURL(file);
+});
+
+// Export OBJ
+document.getElementById('btnExportObj').addEventListener('click', () => {
+  if (!geometry) return;
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  let obj = '# Blueprint 3D Photo Mesh Export\n';
+
+  for (let i = 0; i < pos.count; i++) {
+    obj += `v ${pos.getX(i).toFixed(4)} ${pos.getY(i).toFixed(4)} ${pos.getZ(i).toFixed(4)}\n`;
+  }
+  for (let i = 0; i < uv.count; i++) {
+    obj += `vt ${uv.getX(i).toFixed(4)} ${uv.getY(i).toFixed(4)}\n`;
+  }
+  const index = geometry.index;
+  if (index) {
+    for (let i = 0; i < index.count; i += 3) {
+      const a = index.getX(i) + 1;
+      const b = index.getX(i + 1) + 1;
+      const c = index.getX(i + 2) + 1;
+      obj += `f ${a}/${a} ${b}/${b} ${c}/${c}\n`;
+    }
+  }
+
+  const blob = new Blob([obj], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `3D-Photo-Scan-${Date.now()}.obj`;
+  a.click();
+});
+
+// ─── INITIALIZATION ───────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', () => {
+  initThree();
+  initPhonePairing();
+  initLiveSync();
+  generateProceduralScene('building');
+});
+</script>
+</body>
+</html>
