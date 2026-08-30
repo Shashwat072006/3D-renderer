@@ -517,11 +517,11 @@ input[type="range"] {
 
 <!-- QR Code Phone Pairing Modal -->
 <div class="modal-backdrop" id="phoneModal">
-  <div class="modal-card">
+  <div class="modal-card" style="max-width: 520px">
     <button class="modal-close" id="btnCloseModal">×</button>
     <h3 class="modal-title">Connect Phone Camera</h3>
     <p class="modal-desc">
-      Scan this QR code with your phone (on the same Wi-Fi) or open the URL. Tap <b>Capture</b> on your phone to instantly reconstruct it here in 3D!
+      Scan this QR code with your phone (connected to the same Wi-Fi) or open the URL below to take a photo:
     </p>
 
     <div class="qr-container" id="qrCodeTarget"></div>
@@ -529,6 +529,17 @@ input[type="range"] {
     <div class="qr-url-box">
       <span class="qr-url-text" id="phoneUrlText">Loading connection URL...</span>
       <button class="copy-btn" id="btnCopyUrl">Copy</button>
+    </div>
+
+    <!-- Connection Troubleshooting Box -->
+    <div style="width: 100%; background: var(--navy-deep); border: 1px solid rgba(111, 211, 245, 0.2); padding: 0.85rem 1rem; border-radius: 4px; font-size: 0.75rem; color: var(--paper-dim); line-height: 1.5">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--signal); margin-bottom: 0.4rem; font-size: 0.72rem">
+        CONNECTION TROUBLESHOOTING:
+      </div>
+      <ul style="padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem">
+        <li>Make sure your phone and PC are connected to the <b>same Wi-Fi</b> (or phone mobile hotspot).</li>
+        <li>If phone says <i>"Site can't be reached"</i>, Windows Firewall may be blocking port 3000. In Windows Settings &rarr; Network &rarr; Wi-Fi &rarr; set network profile to <b>Private</b>.</li>
+      </ul>
     </div>
   </div>
 </div>
